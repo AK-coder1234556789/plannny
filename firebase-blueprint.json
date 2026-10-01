@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A study task or note assigned to a specific date and section",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "enum": ["task", "note"] },
+        "section": { "type": "string", "enum": ["lectures", "hw", "doubts"] },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "done": { "type": "boolean" },
+        "labelIds": { "type": "array" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["text", "type", "section", "date", "done", "createdAt"]
+    },
+    "Label": {
+      "title": "Label",
+      "description": "A tag or category for classifying tasks (e.g. Physics, Chemistry, Maths)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["name"]
+    },
+    "Target": {
+      "title": "Target",
+      "description": "A long term or chapter goal with a target deadline",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 200 },
+        "deadline": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "note": { "type": "string", "maxLength": 1000 },
+        "pinned": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "deadline", "createdAt"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "A scheduled event like test, revision, or deadline",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "type": { "type": "string", "enum": ["test", "revision", "deadline", "other"] },
+        "time": { "type": "string" },
+        "note": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "date", "type", "createdAt"]
+    },
+    "Profile": {
+      "title": "Profile",
+      "description": "User preferences and planner layout configuration",
+      "type": "object",
+      "properties": {
+        "layout": { "type": "string", "enum": ["columns", "stack"] },
+        "collapsed": { "type": "boolean" },
+        "accent": { "type": "string" },
+        "showPercent": { "type": "boolean" },
+        "wall": { "type": "string" },
+        "cd": { "type": "object" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tasks created by the user"
+    },
+    "/users/{userId}/labels/{labelId}": {
+      "schema": "Label",
+      "description": "Labels created by the user"
+    },
+    "/users/{userId}/targets/{targetId}": {
+      "schema": "Target",
+      "description": "Study goals and syllabus targets"
+    },
+    "/users/{userId}/events/{eventId}": {
+      "schema": "Event",
+      "description": "Calendar events and exams"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "Profile",
+      "description": "User preferences and customization"
+    }
+  }
+}
