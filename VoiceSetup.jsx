@@ -131,16 +131,24 @@ async function heardOnceViaServer() {
   return data.success && data.transcript ? [data.transcript] : null;
 }
 
-// Try the browser speech service first; if it is blocked/offline, use the server instead
-async function heardSmart(lang) {
-  try {
-    return await heardOnce(lang);
-  } catch (e) {
-    if (e.message === 'network' || e.message === 'unsupported' || e.message === 'service-not-allowed') {
-      return await heardOnceViaServer();
+// Try the browser speech service first. If it errors, OR hears nothing twice in a row
+// (Edge does this silently when online speech is off), switch to the server for good.
+let browserMisses = 0;
+async function heardSmart(lang, onStatus) {
+  if (browserMisses < 2) {
+    try {
+      const r = await heardOnce(lang);
+      if (r && r.length) { browserMisses = 0; return r; }
+      browserMisses++;
+      if (browserMisses < 2) return null;
+      onStatus && onStatus('Browser speech engine heard nothing. Switching to server recognition...');
+    } catch (e) {
+      if (!(e.message === 'network' || e.message === 'unsupported' || e.message === 'service-not-allowed')) throw e;
+      browserMisses = 2;
     }
-    throw e;
   }
+  onStatus && onStatus('Listening for 3 seconds... say it now.');
+  return heardOnceViaServer();
 }
 
 const ERR_TEXT = {
@@ -208,7 +216,7 @@ export default function VoiceSetup({ config, onSave, onClose }) {
       while (good < TRAIN_ROUNDS && tries < MAX_TRIES && !stale()) {
         tries++;
         say(`Say "${phrase.trim()}" now (${good + 1} of ${TRAIN_ROUNDS})`);
-        const guesses = await heardSmart(lang);
+        const guesses = await heardSmart(lang, (t) => say(t));
         if (stale()) return;
         if (!guesses || !guesses.length) { say("Didn't catch that. Speak a little louder and try again."); continue; }
         // The engine often returns the wake word inside a longer guess. Keep only short guesses.
@@ -245,7 +253,7 @@ export default function VoiceSetup({ config, onSave, onClose }) {
     setBusy('test');
     say(`Say "${phrase.trim()}" now…`);
     try {
-      const guesses = await heardSmart(lang);
+      const guesses = await heardSmart(lang, (t) => say(t));
       if (stale()) return;
       const text = guesses && guesses[0] ? guesses[0] : '';
       setLastHeard(text);
