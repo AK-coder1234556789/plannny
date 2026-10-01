@@ -37,8 +37,18 @@ function heardOnce(lang) {
     rec.maxAlternatives = 5;
     let got = null;
     let settled = false;
-    const done = (fn, v) => { if (!settled) { settled = true; clearTimeout(timer); fn(v); } };
+    let hard = null;
+    const done = (fn, v) => { if (!settled) { settled = true; clearTimeout(timer); clearTimeout(hard); fn(v); } };
+    let audioStarted = false;
     const timer = setTimeout(() => { try { rec.abort(); } catch {} }, 6000);
+    // Hard stop that does NOT rely on the browser firing onend (Edge can hang silently).
+    // If the engine never even began capturing audio, report it as dead so we can use the server.
+    hard = setTimeout(() => {
+      try { rec.abort(); } catch {}
+      if (!audioStarted && !got) done(reject, new Error('engine-dead'));
+      else done(resolve, got);
+    }, 8000);
+    rec.onaudiostart = () => { audioStarted = true; };
     rec.onresult = (e) => {
       got = Array.from(e.results[0] || []).map((a) => a.transcript);
     };
@@ -131,20 +141,20 @@ async function heardOnceViaServer() {
   return data.success && data.transcript ? [data.transcript] : null;
 }
 
-// Try the browser speech service first. If it errors, OR hears nothing twice in a row
+// Try the browser speech service first. If it errors, is unresponsive, or hears nothing once
 // (Edge does this silently when online speech is off), switch to the server for good.
 let browserMisses = 0;
 async function heardSmart(lang, onStatus) {
-  if (browserMisses < 2) {
+  if (browserMisses < 1) {
     try {
       const r = await heardOnce(lang);
       if (r && r.length) { browserMisses = 0; return r; }
       browserMisses++;
-      if (browserMisses < 2) return null;
       onStatus && onStatus('Browser speech engine heard nothing. Switching to server recognition...');
     } catch (e) {
-      if (!(e.message === 'network' || e.message === 'unsupported' || e.message === 'service-not-allowed')) throw e;
-      browserMisses = 2;
+      if (!['network', 'unsupported', 'service-not-allowed', 'engine-dead'].includes(e.message)) throw e;
+      browserMisses = 1;
+      onStatus && onStatus('Browser speech engine is not responding. Switching to server recognition...');
     }
   }
   onStatus && onStatus('Listening for 3 seconds... say it now.');
